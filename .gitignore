@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+node_modules/
+src/mnist_celldega/bundled/widget.js
+.DS_Store
+.cache/
+mnist_data_cache/

@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNIST_Celldega — handwritten-digit Leiden clusters with Celldega</title>
+<meta name="description" content="Linked deck.gl MNIST viewer + Celldega clustergram of Leiden clusters of handwritten digits — combined and per-digit variants.">
+
+<style>
+  :root {
+    --fg: #1c1f24;
+    --fg-muted: #5b6470;
+    --bg: #fafbfc;
+    --bg-card: #ffffff;
+    --border: #e3e6ea;
+    --accent: #0072B2;       /* Okabe-Ito blue, matches the digit-1 color in the widget palette */
+    --accent-hover: #005383;
+    --code-bg: #f1f3f5;
+    --shadow: 0 1px 2px rgba(15, 22, 36, 0.04), 0 4px 12px rgba(15, 22, 36, 0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #e8ecf1;
+      --fg-muted: #9aa3b1;
+      --bg: #14171c;
+      --bg-card: #1c2027;
+      --border: #2a2f38;
+      --accent: #56B4E9;
+      --accent-hover: #88c9ee;
+      --code-bg: #20242c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1300px; margin: 0 auto; padding: 48px 32px 96px; }
+  header { margin-bottom: 24px; }
+  h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .tagline { color: var(--fg-muted); margin: 0 0 24px; font-size: 1.125rem; }
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 56px 0 16px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  p { margin: 0 0 14px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.92em;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 14px 0 18px;
+  }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 8px; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    color: var(--fg-muted);
+    background: var(--bg-card);
+  }
+
+  .embed {
+    margin: 24px 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-card);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .embed-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+    color: var(--fg-muted);
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.015));
+  }
+  .embed-bar strong { color: var(--fg); font-weight: 600; }
+  .embed-bar label { color: var(--fg-muted); margin-right: 8px; }
+  .embed-bar select {
+    font: inherit;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .embed-bar select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .embed-bar .openlink { white-space: nowrap; }
+  .embed iframe {
+    display: block;
+    width: 100%;
+    height: 860px;
+    border: 0;
+    background: var(--bg-card);
+  }
+
+  .digit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 24px 0 8px;
+  }
+  .digit-card {
+    display: block;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: inherit;
+    text-decoration: none;
+    transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  }
+  .digit-card:hover {
+    text-decoration: none;
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+  }
+  .digit-card .swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .digit-card .name { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.005em; }
+  .digit-card .meta { color: var(--fg-muted); font-size: 0.8rem; margin-top: 6px; }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--fg-muted);
+    font-size: 0.88rem;
+  }
+</style>
+</head>
+
+<body>
+<main>
+
+<header>
+  <h1>MNIST_Celldega</h1>
+  <p class="tagline">
+    Linked <a href="https://deck.gl/">deck.gl</a> MNIST viewer +
+    <a href="https://github.com/broadinstitute/celldega">Celldega</a>
+    clustergram of <a href="https://www.nature.com/articles/s41598-019-41695-z">Leiden</a>
+    clusters of handwritten digits.
+  </p>
+  <div class="pill-row">
+    <span class="pill">Python · Jupyter · anywidget</span>
+    <span class="pill">deck.gl · WebGL</span>
+    <span class="pill">Celldega clustergram</span>
+    <span class="pill">Scanpy / Leiden clustering</span>
+    <span class="pill">MNIST 70k</span>
+  </div>
+</header>
+
+<section>
+  <h2>What is this?</h2>
+  <p>
+    The MNIST 70k handwritten-digit corpus, embedded with PCA, neighbor-graphed, and
+    Leiden-clustered with <a href="https://scanpy.readthedocs.io/">Scanpy</a> into ~100
+    image clusters. Each cluster is summarized by its mean ink-per-pixel image; the matrix
+    of (top-N pixels &times; clusters) is rendered as a Celldega clustergram, paired with
+    a deck.gl viewer that draws the cluster averages and individual example digits.
+  </p>
+  <p>
+    The two views are <strong>linked in the browser</strong>: clicking a column label
+    (cluster) in the clustergram zooms the viewer in on that cluster's average and
+    examples. Clicking a row label (pixel) marks that pixel's position on every average.
+    Clicking a column-axis dendrogram <strong>averages the selected clusters into one
+    merged image</strong>; clicking a row-axis dendrogram tints each cluster's tile by its
+    mean ink across the selected pixels (so &ldquo;which clusters paint the center
+    column?&rdquo; or &ldquo;which paint the bottom-left curl?&rdquo; pop visually).
+    Clicking a <code>Majority-digit:</code> color on the column strip filters the viewer
+    to clusters of that digit.
+  </p>
+  <p>
+    The row strip shows a value-based <code>Center</code> attribute (each pixel's radial
+    proximity to the image center). Reordering rows by <code>Center</code> surfaces simple
+    structural patterns &mdash; for example, <em>Zero</em> and <em>Seven</em> have very
+    little ink near the image center compared to other digits, so reordering by
+    <code>Center</code> stratifies their cluster columns from the rest.
+  </p>
+  <p>
+    Inspired by the original Clustergrammer
+    <a href="https://nbviewer.org/github/MaayanLab/MNIST_heatmaps/blob/master/notebooks/MNIST_Notebook.ipynb">MNIST_heatmaps</a>
+    notebook, but rebuilt as a linked anywidget pair following the
+    <a href="https://github.com/cornhundred/bike_network_traffic">bike_network_traffic</a>
+    pattern.
+  </p>
+</section>
+
+<section>
+  <h2>Live, in your browser</h2>
+  <p>
+    Pick a variant. The widget below is the linked deck.gl viewer + Celldega Clustergram,
+    with no kernel attached &mdash; all interactions (hover, click, dendrogram select,
+    color-strip filter) run purely in the browser via <code>jsdlink</code>.
+  </p>
+  <div class="embed">
+    <div class="embed-bar">
+      <span>
+        <label for="variant-select">Variant:</label>
+        <select id="variant-select" aria-label="Choose a clustering variant to display">
+          <option value="All_widget.html"   data-meta="Unbiased clustering, all 10 digits">All digits — ~100 Leiden clusters</option>
+          <option value="Zero_widget.html"  data-meta="Zero only">Zero only — 10 Leiden clusters</option>
+          <option value="One_widget.html"   data-meta="One only">One only — 10 Leiden clusters</option>
+          <option value="Two_widget.html"   data-meta="Two only">Two only — 10 Leiden clusters</option>
+          <option value="Three_widget.html" data-meta="Three only">Three only — 10 Leiden clusters</option>
+          <option value="Four_widget.html"  data-meta="Four only">Four only — 10 Leiden clusters</option>
+          <option value="Five_widget.html"  data-meta="Five only">Five only — 10 Leiden clusters</option>
+          <option value="Six_widget.html"   data-meta="Six only">Six only — 10 Leiden clusters</option>
+          <option value="Seven_widget.html" data-meta="Seven only">Seven only — 10 Leiden clusters</option>
+          <option value="Eight_widget.html" data-meta="Eight only">Eight only — 10 Leiden clusters</option>
+          <option value="Nine_widget.html"  data-meta="Nine only">Nine only — 10 Leiden clusters</option>
+        </select>
+      </span>
+      <span class="openlink">
+        <a id="open-widget" href="All_widget.html" target="_blank" rel="noopener">open standalone &uarr;</a>
+      </span>
+    </div>
+    <iframe id="variant-frame" src="All_widget.html"
+            title="MNIST clustergram + viewer"
+            loading="lazy" allow="fullscreen"></iframe>
+  </div>
+  <p style="font-size: 0.88rem; color: var(--fg-muted); margin-top: 10px;">
+    The dropdown swaps between the unbiased combined clustering and one per-digit clustering.
+    Each option loads a self-contained HTML built by <code>build_widget_htmls.ipynb</code>
+    via <code>nbconvert.HTMLExporter(exclude_input=True)</code>.
+  </p>
+</section>
+
+<section>
+  <h2>All digits</h2>
+  <div class="digit-grid">
+    <a class="digit-card" href="All_widget.html"><div><span class="swatch" style="background:#1f77b4"></span><span class="name">All digits</span></div><div class="meta">~100 clusters</div></a>
+    <a class="digit-card" href="Zero_widget.html"><div><span class="swatch" style="background:#E69F00"></span><span class="name">Zero</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="One_widget.html"><div><span class="swatch" style="background:#0072B2"></span><span class="name">One</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Two_widget.html"><div><span class="swatch" style="background:#D55E00"></span><span class="name">Two</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Three_widget.html"><div><span class="swatch" style="background:#56B4E9"></span><span class="name">Three</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Four_widget.html"><div><span class="swatch" style="background:#009E73"></span><span class="name">Four</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Five_widget.html"><div><span class="swatch" style="background:#CC79A7"></span><span class="name">Five</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Six_widget.html"><div><span class="swatch" style="background:#7030A0"></span><span class="name">Six</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Seven_widget.html"><div><span class="swatch" style="background:#404040"></span><span class="name">Seven</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Eight_widget.html"><div><span class="swatch" style="background:#B22222"></span><span class="name">Eight</span></div><div class="meta">10 clusters</div></a>
+    <a class="digit-card" href="Nine_widget.html"><div><span class="swatch" style="background:#1c1c1c"></span><span class="name">Nine</span></div><div class="meta">10 clusters</div></a>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var sel = document.getElementById('variant-select');
+    var frame = document.getElementById('variant-frame');
+    var openWidget = document.getElementById('open-widget');
+    sel.addEventListener('change', function () {
+      var opt = sel.options[sel.selectedIndex];
+      frame.src = opt.value;
+      openWidget.href = opt.value;
+    });
+  })();
+</script>
+
+<section>
+  <h2>How the API works</h2>
+  <p>
+    The Python package loads MNIST via <code>sklearn.datasets.fetch_openml</code> (cached
+    on disk), Leiden-clusters with Scanpy, then aggregates into Celldega-ready DataFrames.
+    The notebook is four lines of setup:
+  </p>
+<pre>from mnist_celldega import (
+    get_mnist_data, cluster_mnist,
+    make_mnist_clustergram, make_mnist_viewer_widget, link_viewer_to_clustergram,
+)
+from ipywidgets import HBox
+
+ds = get_mnist_data()
+clusters = cluster_mnist(ds, mode='all', n_clusters=100)
+mat, cgm = make_mnist_clustergram(clusters)
+viewer = make_mnist_viewer_widget(clusters)
+link_viewer_to_clustergram(viewer, cgm)
+HBox([viewer, cgm])</pre>
+  <p>
+    Per-digit variants reuse the same pipeline with <code>mode='digit', digit=N</code>:
+  </p>
+<pre>clusters = cluster_mnist(ds, mode='digit', digit=7, n_clusters=10)
+# ... rest is identical</pre>
+</section>
+
+<section>
+  <h2>Get it running locally</h2>
+<pre>git clone https://github.com/cornhundred/MNIST_Celldega.git
+cd MNIST_Celldega
+
+uv venv --python 3.11
+source .venv/bin/activate
+uv pip install -e ".[notebooks]"
+(cd js &amp;&amp; npm install &amp;&amp; npm run build)
+
+jupyter lab</pre>
+  <p>Open <code>MNIST.ipynb</code> and run all cells, or run <code>build_widget_htmls.ipynb</code> to regenerate every variant under <code>./</code>.</p>
+</section>
+
+<footer>
+  <p>
+    Built on <a href="https://anywidget.dev/">anywidget</a>,
+    <a href="https://deck.gl/">deck.gl</a>,
+    <a href="https://scanpy.readthedocs.io/">Scanpy</a>, and
+    <a href="https://github.com/broadinstitute/celldega">Celldega</a>.
+    MNIST data via
+    <a href="https://www.openml.org/d/554">OpenML</a> and the original
+    <a href="http://yann.lecun.com/exdb/mnist/">Yann LeCun</a> archive.
+    &nbsp;·&nbsp;
+    Inspired by the
+    <a href="https://nbviewer.org/github/MaayanLab/MNIST_heatmaps/blob/master/notebooks/MNIST_Notebook.ipynb">MaayanLab MNIST_heatmaps</a>
+    notebook and our prior
+    <a href="https://github.com/cornhundred/bike_network_traffic">bike_network_traffic</a>
+    project.
+  </p>
+</footer>
+
+</main>
+</body>
+</html>
