@@ -1,5 +1,7 @@
 # MNIST_Celldega
 
+https://cornhundred.github.io/MNIST_Celldega/
+
 Linked **MNIST digit viewer** (custom anywidget) ↔ **Celldega Clustergram** of
 Leiden clusters of handwritten digits.
 
